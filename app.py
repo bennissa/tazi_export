@@ -5,7 +5,7 @@ import io
 import pandas as pd
 from script import prepare_final_excel, extract_data, extract_data_facture, process_df_facture
 
-st.title("Facture Excel Processing")
+st.title("Ventillation avec intelligence artificielle")
 
 # Upload multiple Excel files (for metadata)
 uploaded_excel_metadata = st.file_uploader("Importer les decharges excel", type=["xlsx"], accept_multiple_files=True)
