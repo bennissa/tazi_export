@@ -8,10 +8,10 @@ from script import prepare_final_excel, extract_data, extract_data_facture, proc
 st.title("Facture Excel Processing")
 
 # Upload multiple Excel files (for metadata)
-uploaded_excel_metadata = st.file_uploader("Upload Metadata Excel Files", type=["xlsx"], accept_multiple_files=True)
+uploaded_excel_metadata = st.file_uploader("Importer les decharges excel", type=["xlsx"], accept_multiple_files=True)
 
 # Upload multiple Excel invoice files
-uploaded_excel_factures = st.file_uploader("Upload Facture Excel Files", type=["xls", "xlsx"], accept_multiple_files=True)
+uploaded_excel_factures = st.file_uploader("Importer les factures excel", type=["xls", "xlsx"], accept_multiple_files=True)
 
 if uploaded_excel_metadata and uploaded_excel_factures:
     # Create a temporary directory to save the uploaded files
@@ -47,7 +47,7 @@ if uploaded_excel_metadata and uploaded_excel_factures:
 
     # 6. Provide download link
     st.download_button(
-        label="Download Processed Excel",
+        label="Télécharger la ventillation",
         data=output,
         file_name="ventillation_template_populated.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
