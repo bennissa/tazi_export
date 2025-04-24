@@ -198,13 +198,14 @@ def extract_data_facture(file_path):
             code = sheet.cell(row=row_index, column=3).value
             if not is_only_digits(code):
                 break
-
+            
             product = {
                 "Designation": sheet.cell(row=row_index, column=4).value.split('/')[0],
                 "Code produit": code,
                 "Quantité": sheet.cell(row=row_index, column=8).value,
                 "Prix total": sheet.cell(row=row_index, column=10).value
             }
+            print(product)
             products.append(product)
             row_index += 2
 
@@ -221,12 +222,13 @@ def process_df_facture(df,data_combined):
     df['Nomenclature'] = df['Code produit'].apply(lambda x: data_combined.get(x, {}).get('Nomenclature', ''))  # Default to empty string if not found
     df['Poids net'] = df['Code produit'].apply(lambda x: data_combined.get(x, {}).get('Poids net', '')) # Default to empty string if not found
     return df
+
 # Function to prepare the final DataFrame and save to Excel
 def prepare_final_excel(df):
     # Read the 'ventillation_template.xlsx' Excel file
     df_template = pd.read_excel('ventillation_template.xlsx')
     print(df_template.columns)
-    df_except_last = df.iloc[:-1]
+    df_except_last = df
     # Create a DataFrame with the same number of rows as df_except_last
     df_template = pd.DataFrame(columns=df_template.columns, index=range(len(df_except_last)))
 
