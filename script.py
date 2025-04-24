@@ -252,6 +252,7 @@ def prepare_final_excel(df):
     df_template["Quantité normalisée"] = df_except_last["Quantité"]
     df_template["Code Référence Accord Article"] = "UE"
     df_template["Code Référence Franchise"] = ''
+    df_template["Nom et Prénom "] = ''
     df_template["CIN"] = ''
 
     df_template["Valeur"] = pd.to_numeric(df_template["Valeur"].replace({',': '.'}, regex=True), errors='coerce')
@@ -284,6 +285,7 @@ def prepare_final_excel(df):
         'Quantité normalisée': 'sum',  # Sum 'Quantité normalisée' column
         'Code Référence Accord Article': 'first',
         'Code Référence Franchise': 'first',
+        'Nom et Prénom ': 'first',
         'CIN': 'first',
     }
     )
