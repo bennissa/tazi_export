@@ -7,7 +7,7 @@ from script import prepare_final_excel, extract_data_decharge, extract_data_fact
 
 st.set_page_config(layout="wide")    # "centered" is the default
 
-st.title("Ventillation avec intelligence artificielle")
+st.title("Ventillation avec intelligence artificielle version 2")
 
 # Upload multiple Excel files (for metadata)
 uploaded_excel_metadata = st.file_uploader("Importer les decharges excel", type=["xlsx"], accept_multiple_files=True)
