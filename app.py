@@ -3,7 +3,9 @@ import tempfile
 import os
 import io
 import pandas as pd
-from script import prepare_final_excel, extract_data, extract_data_facture, process_df_facture
+from script import prepare_final_excel, extract_data_decharge, extract_data_facture, process_df_facture
+
+st.set_page_config(layout="wide")    # "centered" is the default
 
 st.title("Ventillation avec intelligence artificielle")
 
@@ -20,7 +22,7 @@ if uploaded_excel_metadata and uploaded_excel_factures:
     # 1. Combine metadata from extract_data()
     data_combined = {}
     for excel_file in uploaded_excel_metadata:
-        data = extract_data(excel_file)
+        data = extract_data_decharge(excel_file)
         data_combined.update(data)
 
     # 2. Extract and combine all product data from facture Excel files

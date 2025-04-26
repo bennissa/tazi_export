@@ -26,19 +26,64 @@ import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import NamedStyle
 
+def grab_neighbour(ws, *, search_col, label, neighbour_offset=1, default=None):
+    """
+    Search *search_col* (1-based) for the first cell whose value contains
+    *label* (case-insensitive).  Return the value in the same row,
+    *search_col + neighbour_offset*.
+
+    If the label is not found, return *default*.
+    """
+    label = label.lower()
+
+    for cell in ws.iter_rows(min_col=search_col,
+                             max_col=search_col,
+                             values_only=False):        # get Cell objects
+        cell = cell[0]
+        if isinstance(cell.value, str) and label.replace(" ", "") in cell.value.lower().replace(" ", ""):
+            return ws.cell(row=cell.row,
+                           column=search_col + neighbour_offset).value
+    return default
 
 # Function to extract data from Excel file
-def extract_data(file_path):
+# Function to extract the required data from each file
+def extract_data_decharge(file_path):
+    # Load the workbook
     workbook = openpyxl.load_workbook(file_path, data_only=True)
-    sheet = workbook['MODEL 1']
+    
+    # Select the sheet by name
+    sheet = workbook[workbook.sheetnames[0]]
+    
+    # Extract the required values
+    # 1️⃣  Poste / bc    – stays string
+    bc = str(grab_neighbour(sheet,
+                            search_col=2,         # column C (1-based index)
+                            label="bc :",        # or whatever header you trust
+                            neighbour_offset=1    # same column, same row
+                        ) or "").strip()
 
-    # Extract values
-    bc = int(sheet.cell(row=4, column=3).value)
-    description = sheet.cell(row=32, column=3).value
-    nomenclature = re.sub(r'\D', '', str(sheet.cell(row=33, column=7).value))
-    poids = "{:,.5f}".format(sheet.cell(row=35, column=7).value).replace('.', ',') if sheet.cell(row=35, column=7).value else "0,00000"
-    print({bc: {'Description': description, 'Nomenclature': nomenclature, 'Poids net': poids }})
+    # 2️⃣  Description
+    description = grab_neighbour(sheet,
+                                search_col=2,     # column B
+                                label="description",
+                                neighbour_offset=1)
 
+    # 3️⃣  Nomenclature douanière  (digits only)
+    nomenclature = re.sub(r"\D", "", str(
+        grab_neighbour(sheet,
+                    search_col=6,               # column D
+                    label="nomenclature",
+                    neighbour_offset=1) or ""
+    ))
+
+    # 4️⃣  Poids net   (formatted 0,00000 when missing)
+    poids_raw = grab_neighbour(sheet,
+                            search_col=6,       # column D
+                            label="poids net",
+                            neighbour_offset=1)
+    print(poids_raw)
+    poids = "{:,.5f}".format(poids_raw).replace('.', ',') if poids_raw else "0,00000"
+    # Return a dictionary of extracted data with 'bc' as the key
     return {bc: {'Description': description, 'Nomenclature': nomenclature, 'Poids net': poids }}
 
 # Function to process the uploaded file dynamically (Excel + Image)
@@ -163,6 +208,9 @@ Si l'une de ces informations est manquante dans le tableau, vous devez **la lais
 
 def is_only_digits(value):
     return bool(re.fullmatch(r'\d+', str(value).strip()))
+def split_or_empty(text, idx, sep="/"):
+    parts = str(text).split(sep, idx + 1)  # split at most idx + 1 times
+    return parts[idx] if len(parts) > idx else ""
 
 def extract_data_facture(file_path):
     ext = os.path.splitext(file_path)[-1].lower()
@@ -174,14 +222,13 @@ def extract_data_facture(file_path):
         sheet = workbook.sheet_by_index(1)  # Change to desired sheet index if needed
         row_index = 11  # Excel row 12 = index 11
 
-        while row_index < sheet.nrows:
-            code = sheet.cell_value(row_index, 2)  # Column C (index 2)
-            if not is_only_digits(code):
-                break
+        while sheet.cell_value(row_index, 2) and len(sheet.cell_value(row_index, 2).strip()) > 2:
 
             product = {
-                "Designation": sheet.cell_value(row_index, 3).split('/')[0],     # Column D
-                "Code produit": code,
+                "Designation": split_or_empty(sheet.cell_value(row_index, 3),0),     # Column D
+                "Nomenclature": split_or_empty(sheet.cell_value(row_index, 3),1),
+                "Reference": sheet.cell_value(row_index, 1),
+                "Code produit": sheet.cell_value(row_index, 2),
                 "Quantité": sheet.cell_value(row_index, 7),        # Column H
                 "Prix total": sheet.cell_value(row_index, 9)       # Column J
             }
@@ -194,33 +241,84 @@ def extract_data_facture(file_path):
         sheet = workbook[workbook.sheetnames[0]]
         row_index = 12
 
-        while True:
-            code = sheet.cell(row=row_index, column=3).value
-            if not is_only_digits(code):
-                break
-            
+        while sheet.cell(row=row_index, column=3).value and len(sheet.cell(row=row_index, column=3).value.strip()) > 2:
             product = {
-                "Designation": sheet.cell(row=row_index, column=4).value.split('/')[0],
-                "Code produit": code,
+                "Designation": split_or_empty(sheet.cell(row=row_index, column=4).value,0),
+                "Nomenclature": split_or_empty(sheet.cell(row=row_index, column=4).value,1),
+                "Reference": sheet.cell(row=row_index, column=2).value,
+                "Code produit": sheet.cell(row=row_index, column=3).value,
                 "Quantité": sheet.cell(row=row_index, column=8).value,
                 "Prix total": sheet.cell(row=row_index, column=10).value
             }
-            print(product)
             products.append(product)
             row_index += 2
 
     else:
         raise ValueError("Unsupported file type. Please upload .xls or .xlsx files.")
+    df = pd.DataFrame(products)
+    num_cols = ["Quantité", "Prix total"]
 
-    return pd.DataFrame(products)
+    df[num_cols] = (
+        df[num_cols]
+        .astype(str)                                     # ensure .str is available
+        .apply(lambda col: 
+            col
+                .str.replace(r"\.", "", regex=True)        # remove any “.” thousands marks
+                .str.replace(",", ".",  regex=False)       # turn decimal “,” → “.”
+        )
+        .astype(float)                                   # now safe to cast
+        .fillna(0)                                       # blanks → 0
+    )
+
+    df_merged = (
+        df.groupby("Reference", as_index=False)
+        .agg({
+            "Designation" : "first",
+            "Nomenclature": "first",
+            "Code produit": "first",
+            "Quantité"    : "sum",
+            "Prix total"  : "sum",
+        })
+    )
+
+    return df_merged
+def find_article(row, catalogue):
+    """
+    row       – a Series from df
+    catalogue – your data_combined dict mapping keys → {Description, Nomenclature, Poids net, …}
+
+    Returns (description, nomenclature, poids_net)
+    """
+    code = str(row.get("Code produit", "")).strip()
+
+    # 1️⃣  exact key match
+    rec = catalogue.get(code)
+
+    # 2️⃣  fallback: find any key that contains `code`
+    if rec is None and code:
+        for k, v in catalogue.items():
+            if code in str(k):
+                rec = v
+                break
+
+    # 3️⃣  if we found something, pull the fields; otherwise empty strings
+    if rec:
+        return (
+            rec.get("Description", ""),
+            rec.get("Nomenclature", ""),
+            rec.get("Poids net", "")
+        )
+    else:
+        return "", "", ""
 
 def process_df_facture(df,data_combined):
     df['Code produit'] = pd.to_numeric(df['Code produit'], errors='coerce', downcast='integer')
     df['Code produit'] = df['Code produit'].fillna(0).astype(int)
     # Iterate over the DataFrame and use 'Code produit' to get the 'description' and 'nomenclature' from your dictionary
-    df['Description'] = df['Code produit'].apply(lambda x: data_combined.get(x, {}).get('Description', ''))  # Default to empty string if not found
-    df['Nomenclature'] = df['Code produit'].apply(lambda x: data_combined.get(x, {}).get('Nomenclature', ''))  # Default to empty string if not found
-    df['Poids net'] = df['Code produit'].apply(lambda x: data_combined.get(x, {}).get('Poids net', '')) # Default to empty string if not found
+    df[["Description", "Nomenclature", "Poids net"]] = (
+        df.apply(find_article, axis=1, catalogue=data_combined)
+        .apply(pd.Series)
+    )
     return df
 
 # Function to prepare the final DataFrame and save to Excel
